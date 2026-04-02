@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>로그인 / 회원가입 — Tommy Survey</title>
   <link rel="stylesheet" href="/style.css" />
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    .google-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 11px 20px; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); background: var(--surface);
+      font-size: .9rem; font-weight: 600; color: var(--gray-700);
+      cursor: pointer; transition: background .15s, box-shadow .15s;
+    }
+    .google-btn:hover { background: var(--gray-50); box-shadow: var(--shadow-sm); }
+    .google-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+  </style>
 </head>
 <body>
 
@@ -14,9 +27,23 @@
 
     <!-- Tabs -->
     <div class="auth-tabs">
-      <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">로그인</button>
-      <button class="auth-tab" id="tab-register" onclick="switchTab('register')">회원가입</button>
+      <button class="auth-tab active" id="tab-login"    onclick="switchTab('login')">로그인</button>
+      <button class="auth-tab"        id="tab-register" onclick="switchTab('register')">회원가입</button>
     </div>
+
+    <!-- ── Google 로그인 버튼 (공통) ──────────── -->
+    <button class="google-btn" id="google-signin-btn" onclick="startGoogleLogin()">
+      <svg viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        <path fill="none" d="M0 0h48v48H0z"/>
+      </svg>
+      Google로 계속하기
+    </button>
+
+    <div class="auth-divider"><span>또는 이메일로</span></div>
 
     <!-- ── Login Form ─────────────────────── -->
     <div id="form-login">
@@ -30,16 +57,14 @@
       </div>
       <div id="login-error" class="form-error" style="display:none;margin-bottom:12px;"></div>
       <button class="btn btn-primary btn-block btn-lg" onclick="doLogin()">로그인</button>
-      <div class="auth-divider"><span>또는</span></div>
-      <p style="text-align:center;font-size:.83rem;color:var(--text-sub);">
-        데모 계정 — 의뢰자: <code>creator@demo.com</code> / <code>demo1234</code><br/>
+      <p style="text-align:center;font-size:.8rem;color:var(--text-sub);margin-top:14px;">
+        데모 — 의뢰자: <code>creator@demo.com</code> / <code>demo1234</code><br/>
         패널: <code>panel@demo.com</code> / <code>demo1234</code>
       </p>
     </div>
 
     <!-- ── Register Form ──────────────────── -->
     <div id="form-register" style="display:none;">
-      <!-- Role selection -->
       <p style="font-size:.85rem;font-weight:600;color:var(--gray-700);margin-bottom:10px;">역할을 선택하세요</p>
       <div class="role-select">
         <button class="role-btn active" id="role-creator" onclick="selectRole('creator')">
@@ -70,16 +95,147 @@
     </div>
 
     <p style="text-align:center;font-size:.78rem;color:var(--text-sub);margin-top:20px;">
-      가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.
+      가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및
+      <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.
     </p>
+  </div>
+</div>
+
+<!-- ── Google 신규 가입 역할 선택 모달 ─────── -->
+<div class="modal-backdrop" id="google-role-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">역할을 선택해 주세요</span>
+    </div>
+    <p style="font-size:.875rem;color:var(--text-sub);margin-bottom:20px;">
+      <span id="google-user-name" style="font-weight:700;color:var(--gray-900);"></span>님,
+      Tommy Survey에서 어떤 역할로 활동하실 건가요?
+    </p>
+    <div class="role-select">
+      <button class="role-btn active" id="modal-role-creator" onclick="selectGoogleRole('creator')">
+        <div class="role-icon">🧑‍💼</div>
+        <div class="role-name">의뢰자</div>
+        <div class="role-desc">설문 제작·배포</div>
+      </button>
+      <button class="role-btn" id="modal-role-panel" onclick="selectGoogleRole('panel')">
+        <div class="role-icon">👤</div>
+        <div class="role-name">패널</div>
+        <div class="role-desc">설문 참여·보상</div>
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary btn-block btn-lg" onclick="completeGoogleSignup()">시작하기</button>
+    </div>
   </div>
 </div>
 
 <div id="toast-container"></div>
 <script src="/main.js"></script>
 <script>
-let selectedRole = 'creator';
+/* ──────────────────────────────────────────────────────
+   Google OAuth Client ID 설정
+   Google Cloud Console → API 및 서비스 → 사용자 인증 정보
+   → OAuth 2.0 클라이언트 ID 에서 발급 후 아래에 입력하세요.
+   ────────────────────────────────────────────────────── */
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
+let selectedRole    = 'creator';
+let googleRoleModal = 'creator';
+let pendingGoogle   = null;   // { email, name, picture }
+
+/* ── Google Identity Services 초기화 ──────────── */
+window.addEventListener('load', () => {
+  if (typeof google === 'undefined' || !google.accounts) return;
+  if (GOOGLE_CLIENT_ID.startsWith('YOUR_')) return;   // 미설정 시 스킵
+
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+    auto_select: false,
+    cancel_on_tap_outside: true,
+  });
+});
+
+function startGoogleLogin() {
+  if (GOOGLE_CLIENT_ID.startsWith('YOUR_')) {
+    toast('Google Client ID를 auth.html에 설정해 주세요.', 'warning');
+    return;
+  }
+  if (typeof google === 'undefined' || !google.accounts) {
+    toast('Google 로그인 스크립트 로딩 중입니다. 잠시 후 다시 시도하세요.', 'warning');
+    return;
+  }
+  google.accounts.oauth2
+    ? google.accounts.id.prompt()
+    : google.accounts.id.prompt();
+}
+
+/* ── Google 자격증명 콜백 ─────────────────────── */
+function handleGoogleCredential(response) {
+  const payload = decodeJwt(response.credential);
+  const { email, name, picture } = payload;
+
+  const users = DB.getUsers();
+  const existing = users.find(u => u.email === email);
+
+  if (existing) {
+    // 기존 회원 → 바로 로그인
+    DB.setSession({ userId: existing.id, role: existing.role });
+    toast(`${existing.name}님, 환영합니다!`, 'success');
+    setTimeout(() => {
+      window.location.href = existing.role === 'creator' ? '/dashboard.html' : '/panel.html';
+    }, 500);
+  } else {
+    // 신규 → 역할 선택 모달
+    pendingGoogle = { email, name, picture };
+    document.getElementById('google-user-name').textContent = name;
+    document.getElementById('google-role-modal').classList.add('open');
+  }
+}
+
+/* ── JWT 디코드 (서명 검증 없이 payload만) ─────── */
+function decodeJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64    = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const json      = decodeURIComponent(
+    atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+  );
+  return JSON.parse(json);
+}
+
+/* ── Google 신규 가입 역할 선택 ───────────────── */
+function selectGoogleRole(role) {
+  googleRoleModal = role;
+  document.getElementById('modal-role-creator').classList.toggle('active', role === 'creator');
+  document.getElementById('modal-role-panel').classList.toggle('active',   role === 'panel');
+}
+
+function completeGoogleSignup() {
+  if (!pendingGoogle) return;
+  const newUser = {
+    id: genId('user'),
+    email:   pendingGoogle.email,
+    name:    pendingGoogle.name,
+    picture: pendingGoogle.picture,
+    role:    googleRoleModal,
+    password: null,          // Google 계정은 비밀번호 없음
+    credits: googleRoleModal === 'creator' ? 0 : undefined,
+    points:  googleRoleModal === 'panel'   ? 0 : undefined,
+    provider: 'google',
+    createdAt: new Date().toISOString()
+  };
+  const users = DB.getUsers();
+  users.push(newUser);
+  DB.setUsers(users);
+  DB.setSession({ userId: newUser.id, role: newUser.role });
+  document.getElementById('google-role-modal').classList.remove('open');
+  toast('Google 계정으로 가입이 완료되었습니다!', 'success');
+  setTimeout(() => {
+    window.location.href = newUser.role === 'creator' ? '/dashboard.html' : '/panel.html';
+  }, 500);
+}
+
+/* ── 이메일 로그인 ────────────────────────────── */
 function switchTab(tab) {
   document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
   document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
@@ -95,15 +251,14 @@ function selectRole(role) {
 
 function showError(id, msg) {
   const el = document.getElementById(id);
-  el.textContent = msg;
+  el.textContent  = msg;
   el.style.display = 'block';
 }
 
 function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pw    = document.getElementById('login-pw').value;
-  const users = DB.getUsers();
-  const user  = users.find(u => u.email === email && u.password === pw);
+  const user  = DB.getUsers().find(u => u.email === email && u.password === pw);
   if (!user) { showError('login-error', '이메일 또는 비밀번호가 올바르지 않습니다.'); return; }
   DB.setSession({ userId: user.id, role: user.role });
   toast('로그인 성공!', 'success');
@@ -116,8 +271,8 @@ function doRegister() {
   const name  = document.getElementById('reg-name').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const pw    = document.getElementById('reg-pw').value;
-  if (!name)  { showError('reg-error', '이름을 입력해 주세요.'); return; }
-  if (!email) { showError('reg-error', '이메일을 입력해 주세요.'); return; }
+  if (!name)       { showError('reg-error', '이름을 입력해 주세요.'); return; }
+  if (!email)      { showError('reg-error', '이메일을 입력해 주세요.'); return; }
   if (pw.length < 8) { showError('reg-error', '비밀번호는 8자 이상이어야 합니다.'); return; }
   const users = DB.getUsers();
   if (users.find(u => u.email === email)) { showError('reg-error', '이미 사용 중인 이메일입니다.'); return; }
@@ -136,18 +291,15 @@ function doRegister() {
   }, 500);
 }
 
-// 엔터키 지원
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const loginVisible = document.getElementById('form-login').style.display !== 'none';
   if (loginVisible) doLogin(); else doRegister();
 });
 
-// URL 파라미터 확인
 document.addEventListener('DOMContentLoaded', () => {
   const tab = new URLSearchParams(location.search).get('tab');
   if (tab === 'register') switchTab('register');
-  // 이미 로그인 시 리다이렉트
   const user = currentUser();
   if (user) window.location.href = user.role === 'creator' ? '/dashboard.html' : '/panel.html';
 });
