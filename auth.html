@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 / 회원가입 — Tommy Survey</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-card">
+    <a href="/index.html" class="auth-logo">TommySurvey</a>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">로그인</button>
+      <button class="auth-tab" id="tab-register" onclick="switchTab('register')">회원가입</button>
+    </div>
+
+    <!-- ── Login Form ─────────────────────── -->
+    <div id="form-login">
+      <div class="form-group">
+        <label class="form-label">이메일</label>
+        <input type="email" class="form-input" id="login-email" placeholder="이메일을 입력하세요" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">비밀번호</label>
+        <input type="password" class="form-input" id="login-pw" placeholder="비밀번호를 입력하세요" />
+      </div>
+      <div id="login-error" class="form-error" style="display:none;margin-bottom:12px;"></div>
+      <button class="btn btn-primary btn-block btn-lg" onclick="doLogin()">로그인</button>
+      <div class="auth-divider"><span>또는</span></div>
+      <p style="text-align:center;font-size:.83rem;color:var(--text-sub);">
+        데모 계정 — 의뢰자: <code>creator@demo.com</code> / <code>demo1234</code><br/>
+        패널: <code>panel@demo.com</code> / <code>demo1234</code>
+      </p>
+    </div>
+
+    <!-- ── Register Form ──────────────────── -->
+    <div id="form-register" style="display:none;">
+      <!-- Role selection -->
+      <p style="font-size:.85rem;font-weight:600;color:var(--gray-700);margin-bottom:10px;">역할을 선택하세요</p>
+      <div class="role-select">
+        <button class="role-btn active" id="role-creator" onclick="selectRole('creator')">
+          <div class="role-icon">🧑‍💼</div>
+          <div class="role-name">의뢰자</div>
+          <div class="role-desc">설문 제작·배포</div>
+        </button>
+        <button class="role-btn" id="role-panel" onclick="selectRole('panel')">
+          <div class="role-icon">👤</div>
+          <div class="role-name">패널</div>
+          <div class="role-desc">설문 참여·보상</div>
+        </button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">이름</label>
+        <input type="text" class="form-input" id="reg-name" placeholder="홍길동" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">이메일</label>
+        <input type="email" class="form-input" id="reg-email" placeholder="이메일을 입력하세요" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">비밀번호</label>
+        <input type="password" class="form-input" id="reg-pw" placeholder="8자 이상" />
+      </div>
+      <div id="reg-error" class="form-error" style="display:none;margin-bottom:12px;"></div>
+      <button class="btn btn-primary btn-block btn-lg" onclick="doRegister()">가입하기</button>
+    </div>
+
+    <p style="text-align:center;font-size:.78rem;color:var(--text-sub);margin-top:20px;">
+      가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.
+    </p>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+let selectedRole = 'creator';
+
+function switchTab(tab) {
+  document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+}
+
+function selectRole(role) {
+  selectedRole = role;
+  document.getElementById('role-creator').classList.toggle('active', role === 'creator');
+  document.getElementById('role-panel').classList.toggle('active',   role === 'panel');
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw').value;
+  const users = DB.getUsers();
+  const user  = users.find(u => u.email === email && u.password === pw);
+  if (!user) { showError('login-error', '이메일 또는 비밀번호가 올바르지 않습니다.'); return; }
+  DB.setSession({ userId: user.id, role: user.role });
+  toast('로그인 성공!', 'success');
+  setTimeout(() => {
+    window.location.href = user.role === 'creator' ? '/dashboard.html' : '/panel.html';
+  }, 500);
+}
+
+function doRegister() {
+  const name  = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pw    = document.getElementById('reg-pw').value;
+  if (!name)  { showError('reg-error', '이름을 입력해 주세요.'); return; }
+  if (!email) { showError('reg-error', '이메일을 입력해 주세요.'); return; }
+  if (pw.length < 8) { showError('reg-error', '비밀번호는 8자 이상이어야 합니다.'); return; }
+  const users = DB.getUsers();
+  if (users.find(u => u.email === email)) { showError('reg-error', '이미 사용 중인 이메일입니다.'); return; }
+  const newUser = {
+    id: genId('user'), email, password: pw, name, role: selectedRole,
+    credits: selectedRole === 'creator' ? 0 : undefined,
+    points:  selectedRole === 'panel'   ? 0 : undefined,
+    createdAt: new Date().toISOString()
+  };
+  users.push(newUser);
+  DB.setUsers(users);
+  DB.setSession({ userId: newUser.id, role: newUser.role });
+  toast('회원가입 완료!', 'success');
+  setTimeout(() => {
+    window.location.href = newUser.role === 'creator' ? '/dashboard.html' : '/panel.html';
+  }, 500);
+}
+
+// 엔터키 지원
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const loginVisible = document.getElementById('form-login').style.display !== 'none';
+  if (loginVisible) doLogin(); else doRegister();
+});
+
+// URL 파라미터 확인
+document.addEventListener('DOMContentLoaded', () => {
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab === 'register') switchTab('register');
+  // 이미 로그인 시 리다이렉트
+  const user = currentUser();
+  if (user) window.location.href = user.role === 'creator' ? '/dashboard.html' : '/panel.html';
+});
+</script>
+</body>
+</html>

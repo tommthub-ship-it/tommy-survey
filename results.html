@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>결과 분석 — Tommy Survey</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar" id="navbar"></nav>
+
+<main class="page-content">
+  <div class="container">
+
+    <div class="page-header-row page-header">
+      <div>
+        <a href="/dashboard.html" style="font-size:.85rem;color:var(--primary);font-weight:600;display:inline-flex;align-items:center;gap:4px;margin-bottom:8px;">← 대시보드</a>
+        <h1 id="survey-title">결과 분석</h1>
+        <p id="survey-meta" style="margin-top:4px;"></p>
+      </div>
+      <button class="btn btn-secondary" onclick="exportCSV()">Excel 다운로드</button>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Questions analysis -->
+    <div id="q-results"></div>
+
+  </div>
+</main>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+let survey = null;
+let responses = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  const user = requireAuth('creator');
+  if (!user) return;
+
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { window.location.href = '/dashboard.html'; return; }
+
+  survey = DB.getSurveys().find(s => s.id === id);
+  if (!survey || survey.creatorId !== user.id) { window.location.href = '/dashboard.html'; return; }
+
+  responses = DB.getResponses().filter(r => r.surveyId === id);
+  render();
+});
+
+function render() {
+  document.getElementById('survey-title').textContent = survey.title;
+  document.getElementById('survey-meta').innerHTML = `
+    ${statusBadge(survey.status)}
+    <span style="font-size:.82rem;color:var(--text-sub);margin-left:8px;">생성일: ${fmtDate(survey.createdAt)}</span>
+    ${survey.closedAt ? `<span style="font-size:.82rem;color:var(--text-sub);margin-left:8px;">마감일: ${fmtDate(survey.closedAt)}</span>` : ''}
+  `;
+
+  renderStats();
+  renderQResults();
+}
+
+function renderStats() {
+  const total = responses.length;
+  const avgDur = total > 0 ? Math.round(responses.reduce((s, r) => s + (r.duration||0), 0) / total) : 0;
+  const compRate = survey.targetCount ? Math.min(100, Math.round(total / survey.targetCount * 100)) : 0;
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">총 응답 수</div>
+      <div class="stat-value primary">${fmtNum(total)}</div>
+      <div class="stat-sub">목표: ${fmtNum(survey.targetCount || '-')}명</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">달성률</div>
+      <div class="stat-value ${compRate >= 100 ? 'success' : 'primary'}">${compRate}%</div>
+      <div class="stat-sub">${total} / ${survey.targetCount || '-'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">평균 응답 시간</div>
+      <div class="stat-value">${avgDur}<span style="font-size:1rem;font-weight:500;color:var(--text-sub);">초</span></div>
+      <div class="stat-sub">${Math.ceil(avgDur/60)}분 소요</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">문항 수</div>
+      <div class="stat-value">${survey.questions.length}</div>
+      <div class="stat-sub">응답자 1인 기준</div>
+    </div>
+  `;
+}
+
+function renderQResults() {
+  const container = document.getElementById('q-results');
+  if (responses.length === 0) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h3>아직 응답이 없습니다</h3>
+          <p>설문을 발행하고 패널에게 배포하면 결과가 표시됩니다.</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = survey.questions.map((q, i) => {
+    const qAnswers = responses.map(r => r.answers.find(a => a.questionId === q.id)?.value).filter(v => v !== null && v !== undefined && v !== '');
+    return renderQCard(q, i, qAnswers);
+  }).join('');
+
+  // Chart.js 차트 초기화
+  survey.questions.forEach((q, i) => {
+    if (q.type === 'single' || q.type === 'multiple') renderBarChart(q, i);
+    else if (q.type === 'scale' || q.type === 'nps') renderScaleChart(q, i);
+  });
+}
+
+function renderQCard(q, i, qAnswers) {
+  const total = qAnswers.length;
+  let bodyHtml = '';
+
+  if (q.type === 'single') {
+    const counts = {};
+    q.options.forEach(o => counts[o] = 0);
+    qAnswers.forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+    bodyHtml = `<div class="chart-wrap"><canvas id="chart-${i}" height="180"></canvas></div>`;
+  } else if (q.type === 'multiple') {
+    const counts = {};
+    q.options.forEach(o => counts[o] = 0);
+    qAnswers.flat().forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+    bodyHtml = `<div class="chart-wrap"><canvas id="chart-${i}" height="200"></canvas></div>`;
+  } else if (q.type === 'scale' || q.type === 'nps') {
+    const nums = q.type === 'nps' ? [...Array(11)].map((_,n)=>n) : [...Array((q.max||5)-(q.min||1)+1)].map((_,n)=>n+(q.min||1));
+    const avg  = total > 0 ? (qAnswers.reduce((s,v) => s + (Number(v)||0), 0) / total).toFixed(1) : '-';
+    bodyHtml = `
+      <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:.75rem;color:var(--text-sub);">평균 점수</div>
+          <div style="font-size:2rem;font-weight:900;color:var(--primary);">${avg}</div>
+        </div>
+        <div style="flex:1;"><canvas id="chart-${i}" height="140"></canvas></div>
+      </div>
+    `;
+  } else if (q.type === 'text') {
+    bodyHtml = `
+      <div class="text-responses">
+        ${qAnswers.length === 0
+          ? '<p style="color:var(--text-sub);font-size:.85rem;">응답 없음</p>'
+          : qAnswers.map(v => `<div class="text-response-item">${v}</div>`).join('')}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="result-q-card">
+      <div class="result-q-title">Q${i+1}. ${q.text}</div>
+      <div class="result-q-meta">${Q_TYPES[q.type]?.label || q.type} · 응답 ${fmtNum(total)}건</div>
+      ${bodyHtml}
+    </div>
+  `;
+}
+
+function getColors(n) {
+  const palette = ['#6C3CE1','#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6'];
+  return [...Array(n)].map((_, i) => palette[i % palette.length]);
+}
+
+function renderBarChart(q, i) {
+  const canvas = document.getElementById(`chart-${i}`);
+  if (!canvas) return;
+  const qAnswers = responses.map(r => r.answers.find(a => a.questionId === q.id)?.value).filter(v => v !== null && v !== undefined);
+  const counts = {};
+  q.options.forEach(o => counts[o] = 0);
+  qAnswers.flat().forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: q.options,
+      datasets: [{ data: q.options.map(o => counts[o]), backgroundColor: getColors(q.options.length), borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#F3F4F6' } }
+      }
+    }
+  });
+}
+
+function renderScaleChart(q, i) {
+  const canvas = document.getElementById(`chart-${i}`);
+  if (!canvas) return;
+  const qAnswers = responses.map(r => r.answers.find(a => a.questionId === q.id)?.value).filter(v => v !== null && v !== undefined);
+  const nums = q.type === 'nps' ? [...Array(11)].map((_,n)=>n) : [...Array((q.max||5)-(q.min||1)+1)].map((_,n)=>n+(q.min||1));
+  const counts = {};
+  nums.forEach(n => counts[n] = 0);
+  qAnswers.forEach(v => { if (counts[Number(v)] !== undefined) counts[Number(v)]++; });
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: nums.map(String),
+      datasets: [{ data: nums.map(n => counts[n]), backgroundColor: '#6C3CE1', borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#F3F4F6' } }
+      }
+    }
+  });
+}
+
+function exportCSV() {
+  if (responses.length === 0) { toast('다운로드할 응답 데이터가 없습니다.', 'warning'); return; }
+  const headers = ['응답ID', '완료시각', ...survey.questions.map((q, i) => `Q${i+1}.${q.text.slice(0,20)}`)];
+  const rows = responses.map(r => [
+    r.id, fmtDate(r.completedAt),
+    ...survey.questions.map(q => {
+      const ans = r.answers.find(a => a.questionId === q.id)?.value;
+      return Array.isArray(ans) ? ans.join('|') : (ans ?? '');
+    })
+  ]);
+  const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `${survey.title}_결과.csv` });
+  a.click(); URL.revokeObjectURL(url);
+  toast('다운로드를 시작합니다.', 'success');
+}
+</script>
+</body>
+</html>

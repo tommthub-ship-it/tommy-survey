@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>설문 참여 — Tommy Survey</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<div class="survey-page">
+  <!-- Header -->
+  <div class="survey-header">
+    <a href="/index.html" class="survey-logo">TommySurvey</a>
+    <div id="progress-label" style="font-size:.82rem;color:var(--text-sub);"></div>
+  </div>
+
+  <!-- Body -->
+  <div class="survey-body">
+    <div class="survey-card" id="main-card">
+
+      <!-- Intro screen -->
+      <div id="screen-intro">
+        <div style="text-align:center;padding:10px 0 24px;">
+          <div style="font-size:2.5rem;margin-bottom:16px;">📋</div>
+          <h2 id="intro-title" style="font-size:1.4rem;font-weight:900;margin-bottom:10px;"></h2>
+          <p id="intro-desc" style="color:var(--text-sub);font-size:.9rem;line-height:1.7;margin-bottom:20px;"></p>
+          <div id="intro-meta" style="display:flex;justify-content:center;gap:24px;margin-bottom:28px;flex-wrap:wrap;"></div>
+          <button class="btn btn-primary btn-lg" onclick="startSurvey()">설문 시작하기</button>
+        </div>
+      </div>
+
+      <!-- Question screen -->
+      <div id="screen-question" style="display:none;">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+        </div>
+        <div class="survey-card-header">
+          <div class="survey-q-label" id="q-label"></div>
+          <div class="survey-q-text" id="q-text"></div>
+        </div>
+        <div id="q-body"></div>
+        <div class="survey-nav">
+          <button class="btn btn-ghost" id="btn-prev" onclick="prevQ()" style="display:none;">← 이전</button>
+          <span class="survey-counter" id="q-counter"></span>
+          <button class="btn btn-primary" id="btn-next" onclick="nextQ()">다음 →</button>
+        </div>
+      </div>
+
+      <!-- Success screen -->
+      <div id="screen-success" style="display:none;">
+        <div class="survey-success">
+          <div class="success-icon">🎉</div>
+          <h2>설문이 완료되었습니다!</h2>
+          <p>소중한 응답 감사합니다.<br/>응답 결과는 리서치 개선에 활용됩니다.</p>
+          <div id="reward-badge"></div>
+          <div style="margin-top:28px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+            <a href="/panel.html" class="btn btn-primary">내 포인트 확인</a>
+            <a href="/panel.html" class="btn btn-secondary">다른 설문 보기</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+let survey = null;
+let currentQIdx = 0;
+let answers = {};   // questionId → value
+
+document.addEventListener('DOMContentLoaded', () => {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { showError('잘못된 접근입니다.'); return; }
+
+  survey = DB.getSurveys().find(s => s.id === id);
+  if (!survey) { showError('설문을 찾을 수 없습니다.'); return; }
+  if (survey.status !== 'active') { showError('이미 마감된 설문입니다.'); return; }
+
+  // 중복 응답 체크
+  const user = currentUser();
+  if (user && user.role === 'panel') {
+    const already = DB.getResponses().find(r => r.surveyId === id && r.panelId === user.id);
+    if (already) { showError('이미 참여한 설문입니다.'); return; }
+  }
+
+  renderIntro();
+});
+
+function showError(msg) {
+  document.getElementById('main-card').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <h3>${msg}</h3>
+      <a href="/panel.html" class="btn btn-primary" style="margin-top:16px;">돌아가기</a>
+    </div>
+  `;
+}
+
+function renderIntro() {
+  document.getElementById('intro-title').textContent = survey.title;
+  document.getElementById('intro-desc').textContent  = survey.description || '잠시 시간을 내어 설문에 참여해 주세요.';
+  document.getElementById('intro-meta').innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:1.2rem;font-weight:700;">${survey.questions.length}</div>
+      <div style="font-size:.75rem;color:var(--text-sub);">문항</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:1.2rem;font-weight:700;">~${Math.ceil(survey.questions.length * 0.8)}분</div>
+      <div style="font-size:.75rem;color:var(--text-sub);">예상 시간</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:1.2rem;font-weight:700;color:var(--primary);">${fmtNum(survey.reward || 0)} pt</div>
+      <div style="font-size:.75rem;color:var(--text-sub);">보상</div>
+    </div>
+  `;
+}
+
+function startSurvey() {
+  document.getElementById('screen-intro').style.display    = 'none';
+  document.getElementById('screen-question').style.display = '';
+  currentQIdx = 0;
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q   = survey.questions[currentQIdx];
+  const tot = survey.questions.length;
+  const pct = Math.round((currentQIdx / tot) * 100);
+
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${currentQIdx + 1} / ${tot}`;
+  document.getElementById('q-label').textContent  = `문항 ${currentQIdx + 1}`;
+  document.getElementById('q-text').innerHTML    = q.text + (q.required ? '<span class="survey-q-required">*</span>' : '');
+  document.getElementById('q-counter').textContent = `${currentQIdx + 1} / ${tot}`;
+  document.getElementById('btn-prev').style.display  = currentQIdx > 0 ? '' : 'none';
+  document.getElementById('btn-next').textContent = currentQIdx === tot - 1 ? '제출하기' : '다음 →';
+
+  renderQBody(q);
+}
+
+function renderQBody(q) {
+  const container = document.getElementById('q-body');
+  const cur = answers[q.id];
+
+  if (q.type === 'single') {
+    container.innerHTML = `<div class="survey-options">
+      ${q.options.map(opt => `
+        <div class="survey-option ${cur === opt ? 'selected' : ''}" onclick="selectSingle('${q.id}', '${opt.replace(/'/g,"\\'")}', this)">
+          <div class="survey-option-mark"></div>
+          <span>${opt}</span>
+        </div>
+      `).join('')}
+    </div>`;
+  } else if (q.type === 'multiple') {
+    const selected = cur || [];
+    container.innerHTML = `<div class="survey-options">
+      ${q.options.map(opt => `
+        <div class="survey-option ${selected.includes(opt) ? 'selected' : ''}" onclick="toggleMulti('${q.id}', '${opt.replace(/'/g,"\\'")}', this)">
+          <div class="survey-option-mark survey-option-checkbox"></div>
+          <span>${opt}</span>
+        </div>
+      `).join('')}
+    </div>`;
+  } else if (q.type === 'text') {
+    container.innerHTML = `<textarea class="form-textarea" id="text-ans" rows="4" placeholder="답변을 자유롭게 입력하세요">${cur || ''}</textarea>`;
+    document.getElementById('text-ans').addEventListener('input', e => { answers[q.id] = e.target.value; });
+  } else if (q.type === 'scale') {
+    const nums = [];
+    for (let n = (q.min||1); n <= (q.max||5); n++) nums.push(n);
+    container.innerHTML = `
+      <div class="scale-group">
+        ${nums.map(n => `<button class="scale-btn ${cur === n ? 'selected' : ''}" onclick="selectScale('${q.id}', ${n}, this)">${n}</button>`).join('')}
+      </div>
+      <div class="scale-labels">
+        <span>${q.minLabel || ''}</span>
+        <span>${q.maxLabel || ''}</span>
+      </div>
+    `;
+  } else if (q.type === 'nps') {
+    container.innerHTML = `
+      <div class="scale-group" style="flex-wrap:wrap;">
+        ${[...Array(11)].map((_,n) => `<button class="scale-btn ${cur === n ? 'selected' : ''}" onclick="selectScale('${q.id}', ${n}, this)">${n}</button>`).join('')}
+      </div>
+      <div class="scale-labels"><span>전혀 추천 안 함 (0)</span><span>적극 추천 (10)</span></div>
+    `;
+  }
+}
+
+function selectSingle(qId, val, el) {
+  answers[qId] = val;
+  el.closest('.survey-options').querySelectorAll('.survey-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function toggleMulti(qId, val, el) {
+  if (!answers[qId]) answers[qId] = [];
+  const idx = answers[qId].indexOf(val);
+  if (idx === -1) answers[qId].push(val);
+  else answers[qId].splice(idx, 1);
+  el.classList.toggle('selected', answers[qId].includes(val));
+}
+
+function selectScale(qId, val, el) {
+  answers[qId] = val;
+  el.closest('.scale-group').querySelectorAll('.scale-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function nextQ() {
+  const q = survey.questions[currentQIdx];
+  if (q.required && !hasAnswer(q)) {
+    toast('필수 문항입니다. 답변을 선택해 주세요.', 'warning');
+    return;
+  }
+  if (currentQIdx === survey.questions.length - 1) {
+    submitSurvey();
+  } else {
+    currentQIdx++;
+    renderQuestion();
+  }
+}
+
+function prevQ() {
+  if (currentQIdx > 0) { currentQIdx--; renderQuestion(); }
+}
+
+function hasAnswer(q) {
+  const ans = answers[q.id];
+  if (ans === undefined || ans === null || ans === '') return false;
+  if (Array.isArray(ans) && ans.length === 0) return false;
+  return true;
+}
+
+function submitSurvey() {
+  const user = currentUser();
+  const panelId = user ? user.id : genId('anon');
+
+  const response = {
+    id: genId('resp'), surveyId: survey.id, panelId,
+    answers: survey.questions.map(q => ({ questionId: q.id, value: answers[q.id] ?? null })),
+    completedAt: new Date().toISOString(),
+    duration: Math.floor(Math.random() * 180) + 60
+  };
+
+  const responses = DB.getResponses();
+  responses.push(response);
+  DB.setResponses(responses);
+
+  // 포인트 지급 (패널 로그인 시)
+  if (user && user.role === 'panel') {
+    const users = DB.getUsers();
+    const u = users.find(u => u.id === user.id);
+    if (u) { u.points = (u.points || 0) + (survey.reward || 200); DB.setUsers(users); }
+  }
+
+  document.getElementById('screen-question').style.display = 'none';
+  document.getElementById('screen-success').style.display  = '';
+  document.getElementById('progress-label').textContent = '완료';
+  document.getElementById('progress-bar').style.width  = '100%';
+
+  if (user && user.role === 'panel') {
+    document.getElementById('reward-badge').innerHTML = `
+      <div class="point-badge">+${fmtNum(survey.reward || 200)} pt 적립!</div>
+    `;
+  }
+}
+</script>
+</body>
+</html>

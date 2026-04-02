@@ -1,17 +1,224 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tommy Survey</title>
-  <link href='/style.css' rel='stylesheet'>
+  <title>Tommy Survey — 누구나 5분 안에 전문 리서치</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main>
-    <h1>Tommy Survey</h1>
-    <p>Welcome to our survey. Please press the button below to start.</p>
-    <button id="start-survey">Start Survey</button>
-  </main>
-  <script defer type="text/javascript" src="/main.js"></script>
+
+<!-- ── Navbar ────────────────────────────────────────── -->
+<nav class="landing-nav">
+  <div class="container" style="display:flex;align-items:center;gap:16px;">
+    <a href="/" class="navbar-logo" style="flex:1;">Tommy<span>Survey</span></a>
+    <div id="nav-links"></div>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────── -->
+<section class="hero-section">
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-tag">✨ 오픈서베이를 넘어서는 리서치 플랫폼</div>
+      <h1 class="hero-title">
+        5분 안에 시작하는<br/>
+        <span class="accent">전문 설문조사</span>
+      </h1>
+      <p class="hero-desc">
+        설문 빌더로 원하는 문항을 만들고, 검증된 패널에게 즉시 배포하세요.<br/>
+        실시간 결과 분석까지 한 플랫폼에서 해결합니다.
+      </p>
+      <div class="hero-cta">
+        <a href="/auth.html?tab=register" class="btn btn-primary btn-lg">무료로 시작하기</a>
+        <a href="#features" class="btn btn-lg" style="background:rgba(255,255,255,.15);color:white;border:1.5px solid rgba(255,255,255,.3);">기능 살펴보기</a>
+      </div>
+      <p style="margin-top:20px;font-size:.8rem;opacity:.5;color:white;">신용카드 불필요 · 무료 플랜 영구 제공</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Social Proof ───────────────────────────────────── -->
+<section style="background:var(--surface);padding:32px 0;border-bottom:1px solid var(--border);">
+  <div class="container">
+    <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:48px;text-align:center;">
+      <div>
+        <div style="font-size:1.8rem;font-weight:900;color:var(--primary);">2,000+</div>
+        <div style="font-size:.82rem;color:var(--text-sub);margin-top:2px;">의뢰자 가입</div>
+      </div>
+      <div>
+        <div style="font-size:1.8rem;font-weight:900;color:var(--primary);">50,000+</div>
+        <div style="font-size:.82rem;color:var(--text-sub);margin-top:2px;">검증 패널</div>
+      </div>
+      <div>
+        <div style="font-size:1.8rem;font-weight:900;color:var(--primary);">500+</div>
+        <div style="font-size:.82rem;color:var(--text-sub);margin-top:2px;">월간 설문 배포</div>
+      </div>
+      <div>
+        <div style="font-size:1.8rem;font-weight:900;color:var(--primary);">70%</div>
+        <div style="font-size:.82rem;color:var(--text-sub);margin-top:2px;">평균 완료율</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────── -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-tag">핵심 기능</div>
+    <h2 class="section-title">리서치의 모든 것을 한 곳에서</h2>
+    <p class="section-desc">설문 제작부터 패널 배포, 실시간 분석까지.<br/>Tommy Survey 하나면 충분합니다.</p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🛠</div>
+        <div class="feature-title">직관적인 설문 빌더</div>
+        <p class="feature-desc">드래그앤드롭으로 문항을 자유롭게 구성하세요. 단일/복수 선택, 척도형, NPS, 주관식 등 다양한 문항 유형을 지원합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-title">정밀한 타깃 패널 필터</div>
+        <p class="feature-desc">성별, 연령, 지역, 직업, 소비 행동까지. 원하는 응답자를 정확하게 타겟팅하고 실시간으로 표본 크기를 확인하세요.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">실시간 결과 분석</div>
+        <p class="feature-desc">응답이 들어오는 즉시 차트와 크로스탭이 업데이트됩니다. PDF·Excel 리포트로 팀과 쉽게 공유하세요.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">빠른 응답 수집</div>
+        <p class="feature-desc">50,000명의 검증된 패널이 대기 중입니다. 설문 배포 후 평균 24시간 내 목표 응답 수를 달성합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">데이터 보안·익명화</div>
+        <p class="feature-desc">개인정보보호법 완전 준수. 모든 응답은 익명화 처리되며 HTTPS 암호화로 안전하게 전송·저장됩니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💰</div>
+        <div class="feature-title">투명한 패널 보상</div>
+        <p class="feature-desc">설문 완료 즉시 포인트 적립. 5,000pt 이상 현금 전환 가능. 탈락 시에도 위로 포인트를 지급합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ───────────────────────────────────── -->
+<section class="section" style="background:var(--gray-50);" id="how">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-tag">이용 방법</div>
+      <h2 class="section-title">딱 3단계로 끝납니다</h2>
+      <p class="section-desc">복잡한 리서치 과정을 단순하게. 기획부터 결과까지 Tommy Survey가 함께합니다.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">설문 만들기</div>
+        <p class="step-desc">빌더에서 문항을 구성하거나 30종 이상의 검증된 템플릿을 선택하세요.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">타깃 설정 & 배포</div>
+        <p class="step-desc">응답자 조건을 설정하고 결제하면 검증된 패널에게 즉시 발송됩니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">결과 분석</div>
+        <p class="step-desc">실시간 대시보드에서 결과를 확인하고 PDF·Excel로 다운로드하세요.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pricing ────────────────────────────────────────── -->
+<section class="section" id="pricing">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-tag">요금제</div>
+      <h2 class="section-title">합리적인 가격으로 시작하세요</h2>
+      <p class="section-desc">소규모 리서치부터 대규모 기업 조사까지 맞는 플랜을 선택하세요.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-name">Free</div>
+        <div class="pricing-price">0<span>원</span></div>
+        <div class="pricing-desc">개인·학습용으로 충분</div>
+        <div class="pricing-features">
+          <div class="pricing-feature">자체 링크 배포</div>
+          <div class="pricing-feature">응답 100건/월</div>
+          <div class="pricing-feature">기본 문항 10개</div>
+          <div class="pricing-feature">기본 결과 화면</div>
+        </div>
+        <a href="/auth.html?tab=register" class="btn btn-outline btn-block">무료로 시작</a>
+      </div>
+      <div class="pricing-card featured">
+        <div class="pricing-name">Business</div>
+        <div class="pricing-price">99,000<span>원/월</span></div>
+        <div class="pricing-desc">중소기업·스타트업 최적</div>
+        <div class="pricing-features">
+          <div class="pricing-feature">패널 배포 1,000응답/월</div>
+          <div class="pricing-feature">전체 문항 유형</div>
+          <div class="pricing-feature">로직 분기 설정</div>
+          <div class="pricing-feature">크로스탭 분석</div>
+          <div class="pricing-feature">Excel·PDF 다운로드</div>
+        </div>
+        <a href="/auth.html?tab=register" class="btn btn-primary btn-block">14일 무료체험</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-name">Enterprise</div>
+        <div class="pricing-price" style="font-size:1.6rem;">별도<span> 문의</span></div>
+        <div class="pricing-desc">대기업·리서치 기관</div>
+        <div class="pricing-features">
+          <div class="pricing-feature">무제한 응답</div>
+          <div class="pricing-feature">전담 PM 배정</div>
+          <div class="pricing-feature">커스텀 패널 구성</div>
+          <div class="pricing-feature">SLA 보장</div>
+          <div class="pricing-feature">API 연동</div>
+        </div>
+        <a href="mailto:biz@tommysurvey.kr" class="btn btn-secondary btn-block">문의하기</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA Banner ─────────────────────────────────────── -->
+<section style="background:linear-gradient(135deg,var(--primary),var(--secondary));padding:64px 0;">
+  <div class="container" style="text-align:center;color:white;">
+    <h2 style="font-size:2rem;font-weight:900;margin-bottom:12px;">지금 바로 첫 설문을 시작해 보세요</h2>
+    <p style="opacity:.8;font-size:1rem;margin-bottom:32px;">신용카드 없이, 5분 만에 무료로 시작할 수 있습니다.</p>
+    <a href="/auth.html?tab=register" class="btn btn-lg" style="background:white;color:var(--primary);font-weight:800;">무료 회원가입</a>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────── -->
+<footer class="landing-footer">
+  <div class="container">
+    <strong>TommySurvey</strong>
+    <p style="margin-top:8px;">© 2026 Tommy Survey. All rights reserved.</p>
+    <p style="margin-top:4px;font-size:.78rem;">개인정보처리방침 · 이용약관 · 문의: hello@tommysurvey.kr</p>
+  </div>
+</footer>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const user = currentUser();
+  const navLinks = document.getElementById('nav-links');
+  if (user) {
+    const dest = user.role === 'creator' ? '/dashboard.html' : '/panel.html';
+    navLinks.innerHTML = `
+      <a href="${dest}" class="btn btn-primary btn-sm">내 대시보드</a>
+    `;
+  } else {
+    navLinks.innerHTML = `
+      <a href="/auth.html" class="btn btn-ghost btn-sm" style="color:var(--gray-700);">로그인</a>
+      <a href="/auth.html?tab=register" class="btn btn-primary btn-sm">시작하기</a>
+    `;
+  }
+});
+</script>
 </body>
 </html>

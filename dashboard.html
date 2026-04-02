@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>대시보드 — Tommy Survey</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<nav class="navbar" id="navbar"></nav>
+
+<main class="page-content">
+  <div class="container">
+
+    <!-- Page header -->
+    <div class="page-header-row page-header">
+      <div>
+        <h1 id="greeting">안녕하세요!</h1>
+        <p>내 설문 현황을 확인하고 새 설문을 만들어 보세요.</p>
+      </div>
+      <a href="/builder.html" class="btn btn-primary">+ 새 설문 만들기</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Surveys list -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">내 설문 목록</span>
+        <div style="display:flex;gap:8px;" id="filter-btns">
+          <button class="btn btn-secondary btn-sm active-filter" data-filter="all" onclick="filterSurveys('all')">전체</button>
+          <button class="btn btn-ghost btn-sm" data-filter="active"  onclick="filterSurveys('active')">진행중</button>
+          <button class="btn btn-ghost btn-sm" data-filter="draft"   onclick="filterSurveys('draft')">임시저장</button>
+          <button class="btn btn-ghost btn-sm" data-filter="closed"  onclick="filterSurveys('closed')">완료</button>
+        </div>
+      </div>
+      <div id="survey-list"></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Delete confirm modal -->
+<div class="modal-backdrop" id="del-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">설문 삭제</span>
+      <button class="modal-close" onclick="closeDelModal()">×</button>
+    </div>
+    <p style="font-size:.9rem;color:var(--text-sub);">이 설문을 삭제하면 응답 데이터도 함께 삭제됩니다. 계속하시겠습니까?</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDelModal()">취소</button>
+      <button class="btn btn-danger" id="del-confirm-btn">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+let user;
+let allSurveys = [];
+let currentFilter = 'all';
+let pendingDeleteId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  user = requireAuth('creator');
+  if (!user) return;
+
+  document.getElementById('greeting').textContent = `안녕하세요, ${user.name}님!`;
+  loadData();
+});
+
+function loadData() {
+  allSurveys = DB.getSurveys().filter(s => s.creatorId === user.id);
+  renderStats();
+  renderSurveys(currentFilter);
+}
+
+function renderStats() {
+  const total    = allSurveys.length;
+  const active   = allSurveys.filter(s => s.status === 'active').length;
+  const closed   = allSurveys.filter(s => s.status === 'closed').length;
+  const totalResp = allSurveys.reduce((sum, s) => sum + getResponseCount(s.id), 0);
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">전체 설문</div>
+      <div class="stat-value primary">${total}</div>
+      <div class="stat-sub">누적 생성</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">진행중</div>
+      <div class="stat-value success">${active}</div>
+      <div class="stat-sub">활성 설문</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">총 응답 수</div>
+      <div class="stat-value primary">${fmtNum(totalResp)}</div>
+      <div class="stat-sub">누적 응답</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">완료 설문</div>
+      <div class="stat-value">${closed}</div>
+      <div class="stat-sub">마감됨</div>
+    </div>
+  `;
+}
+
+function filterSurveys(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('[data-filter]').forEach(btn => {
+    const isActive = btn.dataset.filter === filter;
+    btn.classList.toggle('btn-secondary', isActive);
+    btn.classList.toggle('btn-ghost',     !isActive);
+  });
+  renderSurveys(filter);
+}
+
+function renderSurveys(filter) {
+  const container = document.getElementById('survey-list');
+  const list = filter === 'all' ? allSurveys : allSurveys.filter(s => s.status === filter);
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>${filter === 'all' ? '아직 설문이 없습니다' : '해당 상태의 설문이 없습니다'}</h3>
+        <p>새 설문을 만들어 시작해 보세요!</p>
+        <a href="/builder.html" class="btn btn-primary" style="margin-top:16px;">+ 설문 만들기</a>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>설문 제목</th>
+            <th>상태</th>
+            <th>문항 수</th>
+            <th>응답 / 목표</th>
+            <th>생성일</th>
+            <th>관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(s => {
+            const respCnt  = getResponseCount(s.id);
+            const progress = s.targetCount ? Math.min(100, Math.round(respCnt / s.targetCount * 100)) : 0;
+            return `
+              <tr>
+                <td>
+                  <div style="font-weight:600;">${s.title}</div>
+                  <div style="font-size:.78rem;color:var(--text-sub);margin-top:2px;">${s.description ? s.description.slice(0,40) + (s.description.length>40?'…':'') : ''}</div>
+                </td>
+                <td>${statusBadge(s.status)}</td>
+                <td style="color:var(--text-sub);">${s.questions.length}개</td>
+                <td>
+                  <div style="font-weight:600;">${fmtNum(respCnt)} / ${fmtNum(s.targetCount || '-')}</div>
+                  ${s.targetCount ? `
+                    <div style="margin-top:4px;">
+                      <div style="height:4px;background:var(--gray-200);border-radius:999px;width:80px;">
+                        <div style="height:100%;width:${progress}%;background:var(--primary);border-radius:999px;"></div>
+                      </div>
+                    </div>` : ''}
+                </td>
+                <td style="color:var(--text-sub);font-size:.85rem;">${fmtDate(s.createdAt)}</td>
+                <td>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${s.status !== 'closed' ? `<a href="/builder.html?id=${s.id}" class="btn btn-ghost btn-sm">편집</a>` : ''}
+                    ${s.status === 'active' ? `<a href="/survey.html?id=${s.id}" target="_blank" class="btn btn-ghost btn-sm">미리보기</a>` : ''}
+                    <a href="/results.html?id=${s.id}" class="btn btn-secondary btn-sm">결과 보기</a>
+                    ${s.status !== 'closed' ? `<button class="btn btn-ghost btn-sm" onclick="closeSurvey('${s.id}')">마감</button>` : ''}
+                    <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="openDelModal('${s.id}')">삭제</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function closeSurvey(id) {
+  const surveys = DB.getSurveys();
+  const s = surveys.find(s => s.id === id);
+  if (!s) return;
+  s.status = 'closed';
+  s.closedAt = new Date().toISOString();
+  DB.setSurveys(surveys);
+  toast('설문이 마감되었습니다.', 'success');
+  loadData();
+}
+
+function openDelModal(id) {
+  pendingDeleteId = id;
+  document.getElementById('del-modal').classList.add('open');
+  document.getElementById('del-confirm-btn').onclick = () => deleteSurvey(id);
+}
+
+function closeDelModal() {
+  pendingDeleteId = null;
+  document.getElementById('del-modal').classList.remove('open');
+}
+
+function deleteSurvey(id) {
+  DB.setSurveys(DB.getSurveys().filter(s => s.id !== id));
+  DB.setResponses(DB.getResponses().filter(r => r.surveyId !== id));
+  closeDelModal();
+  toast('설문이 삭제되었습니다.', 'success');
+  loadData();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>패널 홈 — Tommy Survey</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<nav class="navbar" id="navbar"></nav>
+
+<main class="page-content">
+  <div class="container-sm">
+
+    <!-- Points card -->
+    <div class="point-card">
+      <div style="position:relative;z-index:1;">
+        <div class="point-card-label">내 포인트</div>
+        <div class="point-card-value" id="my-points">0</div>
+        <div class="point-card-sub">1pt = 1원 · 5,000pt 이상 출금 가능</div>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:white;margin-top:14px;border:1px solid rgba(255,255,255,.3);" onclick="openWithdrawModal()">포인트 출금 신청</button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+      <div class="stat-card" style="padding:16px;text-align:center;">
+        <div class="stat-label">참여 설문</div>
+        <div class="stat-value primary" id="stat-done">0</div>
+      </div>
+      <div class="stat-card" style="padding:16px;text-align:center;">
+        <div class="stat-label">획득 포인트</div>
+        <div class="stat-value primary" id="stat-earned">0</div>
+      </div>
+      <div class="stat-card" style="padding:16px;text-align:center;">
+        <div class="stat-label">진행 가능</div>
+        <div class="stat-value primary" id="stat-avail">0</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="available" onclick="switchTab('available')">참여 가능한 설문</button>
+      <button class="tab-btn" data-tab="done" onclick="switchTab('done')">완료한 설문</button>
+    </div>
+
+    <!-- Available surveys -->
+    <div id="tab-available">
+      <div class="survey-feed" id="available-feed"></div>
+    </div>
+
+    <!-- Done surveys -->
+    <div id="tab-done" style="display:none;">
+      <div id="done-feed"></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Withdraw modal -->
+<div class="modal-backdrop" id="withdraw-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">포인트 출금</span>
+      <button class="modal-close" onclick="closeWithdrawModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">출금 포인트</label>
+      <input type="number" class="form-input" id="withdraw-amt" placeholder="최소 5,000pt" min="5000" step="1000" />
+      <div class="form-hint">보유: <span id="withdraw-avail">0</span>pt</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">입금 계좌 (예시)</label>
+      <input type="text" class="form-input" placeholder="은행명 계좌번호 예금주" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeWithdrawModal()">취소</button>
+      <button class="btn btn-primary" onclick="doWithdraw()">출금 신청</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+let user;
+let myResponses = [];
+let allSurveys  = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  user = requireAuth('panel');
+  if (!user) return;
+  loadData();
+});
+
+function loadData() {
+  // 최신 유저 정보 다시 로드
+  user = DB.getUsers().find(u => u.id === user.id) || user;
+
+  myResponses = DB.getResponses().filter(r => r.panelId === user.id);
+  allSurveys  = DB.getSurveys().filter(s => s.status === 'active');
+
+  const completedIds = new Set(myResponses.map(r => r.surveyId));
+  const available = allSurveys.filter(s => !completedIds.has(s.id));
+  const done      = myResponses.map(r => {
+    const s = DB.getSurveys().find(sv => sv.id === r.surveyId);
+    return s ? { survey: s, response: r } : null;
+  }).filter(Boolean).reverse();
+
+  // Stats
+  document.getElementById('my-points').textContent = fmtNum(user.points || 0);
+  document.getElementById('stat-done').textContent   = fmtNum(myResponses.length);
+  document.getElementById('stat-earned').textContent  = fmtNum(myResponses.length * 200); // 추정
+  document.getElementById('stat-avail').textContent   = fmtNum(available.length);
+  document.getElementById('withdraw-avail').textContent = fmtNum(user.points || 0);
+
+  renderAvailable(available);
+  renderDone(done);
+}
+
+function renderAvailable(list) {
+  const container = document.getElementById('available-feed');
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>지금 참여 가능한 설문이 없습니다</h3>
+        <p>새 설문이 등록되면 알려드릴게요!</p>
+      </div>
+    `;
+    return;
+  }
+  container.innerHTML = list.map(s => {
+    const qCnt = s.questions.length;
+    const estMin = Math.ceil(qCnt * 0.8);
+    const icons  = ['📱','🛒','🎬','🍕','✈️','🏠','💄','🎮'];
+    const icon   = icons[s.id.charCodeAt(0) % icons.length];
+    return `
+      <div class="feed-card">
+        <div class="feed-card-icon">${icon}</div>
+        <div class="feed-card-body">
+          <div class="feed-card-title">${s.title}</div>
+          <div class="feed-card-meta">
+            <span>📋 ${qCnt}문항</span>
+            <span>⏱ 약 ${estMin}분</span>
+            <span style="color:var(--success);">🟢 진행중</span>
+          </div>
+        </div>
+        <div class="feed-card-reward">
+          <div class="reward-value">+${fmtNum(s.reward||200)}</div>
+          <div class="reward-label">포인트</div>
+          <a href="/survey.html?id=${s.id}" class="btn btn-primary btn-sm" style="margin-top:8px;">참여하기</a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDone(list) {
+  const container = document.getElementById('done-feed');
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h3>아직 참여한 설문이 없습니다</h3>
+        <p>위 탭에서 설문에 참여해 보세요!</p>
+      </div>
+    `;
+    return;
+  }
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>설문 제목</th>
+            <th>참여일</th>
+            <th>획득 포인트</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(({survey: s, response: r}) => `
+            <tr>
+              <td style="font-weight:600;">${s.title}</td>
+              <td style="font-size:.85rem;color:var(--text-sub);">${fmtDate(r.completedAt)}</td>
+              <td><span style="color:var(--primary);font-weight:700;">+${fmtNum(s.reward||200)} pt</span></td>
+              <td><span class="badge badge-active">완료</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('tab-available').style.display = tab === 'available' ? '' : 'none';
+  document.getElementById('tab-done').style.display      = tab === 'done'      ? '' : 'none';
+}
+
+function openWithdrawModal() {
+  document.getElementById('withdraw-avail').textContent = fmtNum(user.points || 0);
+  document.getElementById('withdraw-modal').classList.add('open');
+}
+function closeWithdrawModal() {
+  document.getElementById('withdraw-modal').classList.remove('open');
+}
+
+function doWithdraw() {
+  const amt = parseInt(document.getElementById('withdraw-amt').value);
+  if (!amt || amt < 5000) { toast('최소 5,000pt 이상 출금 가능합니다.', 'warning'); return; }
+  if (amt > (user.points || 0)) { toast('포인트가 부족합니다.', 'error'); return; }
+  const users = DB.getUsers();
+  const u = users.find(u => u.id === user.id);
+  if (u) { u.points -= amt; DB.setUsers(users); }
+  closeWithdrawModal();
+  toast(`${fmtNum(amt)}pt 출금 신청이 완료되었습니다. 영업일 3일 내 입금됩니다.`, 'success');
+  loadData();
+}
+</script>
+</body>
+</html>

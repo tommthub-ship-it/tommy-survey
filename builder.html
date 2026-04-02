@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>설문 빌더 — Tommy Survey</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<nav class="navbar" id="navbar"></nav>
+
+<main class="page-content">
+  <div class="container">
+
+    <!-- Toolbar -->
+    <div class="builder-toolbar">
+      <div>
+        <a href="/dashboard.html" class="btn btn-ghost btn-sm" style="margin-right:8px;">← 대시보드</a>
+        <span class="builder-toolbar-title" id="survey-title-display">새 설문</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="togglePreview()" id="preview-btn">미리보기</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveDraft()">임시저장</button>
+        <button class="btn btn-primary btn-sm" onclick="openPublishModal()">발행하기</button>
+      </div>
+    </div>
+
+    <!-- Builder layout -->
+    <div class="builder-layout" id="builder-view">
+
+      <!-- Sidebar: question list -->
+      <div class="builder-sidebar">
+        <div class="builder-sidebar-title">문항 목록</div>
+        <div id="q-list"></div>
+        <button class="btn btn-outline btn-block btn-sm" style="margin-top:12px;" onclick="addQuestion()">+ 문항 추가</button>
+
+        <hr class="divider" />
+        <div class="builder-sidebar-title">설문 정보</div>
+        <div class="form-group">
+          <label class="form-label">설문 제목</label>
+          <input type="text" class="form-input" id="info-title" placeholder="설문 제목을 입력하세요" oninput="updateTitle(this.value)" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">설명</label>
+          <textarea class="form-textarea" id="info-desc" placeholder="설문 소개 (선택)"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">목표 응답 수</label>
+          <input type="number" class="form-input" id="info-target" placeholder="예: 100" min="10" max="10000" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">응답자 보상 (포인트)</label>
+          <select class="form-select" id="info-reward">
+            <option value="100">100 pt (약 1분)</option>
+            <option value="200" selected>200 pt (약 5분)</option>
+            <option value="300">300 pt (약 10분)</option>
+            <option value="500">500 pt (약 15분+)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Main: question editor -->
+      <div class="builder-main">
+        <div id="editor-area">
+          <div class="empty-state" id="empty-editor">
+            <div class="empty-icon">✏️</div>
+            <h3>문항을 추가해 보세요</h3>
+            <p>왼쪽의 '+ 문항 추가' 버튼을 눌러 첫 번째 문항을 만드세요.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview view -->
+    <div id="preview-view" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-size:1.2rem;font-weight:700;" id="preview-title">미리보기</h2>
+        <button class="btn btn-secondary" onclick="togglePreview()">← 빌더로 돌아가기</button>
+      </div>
+      <div id="preview-content"></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Publish modal -->
+<div class="modal-backdrop" id="publish-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">설문 발행</span>
+      <button class="modal-close" onclick="closePublishModal()">×</button>
+    </div>
+    <p style="font-size:.9rem;color:var(--text-sub);margin-bottom:16px;">설문을 발행하면 패널에게 배포됩니다. 발행 후에는 문항 수정이 제한됩니다.</p>
+    <div style="background:var(--gray-50);border-radius:var(--radius);padding:16px;font-size:.85rem;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:var(--text-sub);">문항 수</span>
+        <span id="pub-q-count" style="font-weight:700;">-</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:var(--text-sub);">목표 응답</span>
+        <span id="pub-target" style="font-weight:700;">-</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:var(--text-sub);">응답자 보상</span>
+        <span id="pub-reward" style="font-weight:700;">-</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePublishModal()">취소</button>
+      <button class="btn btn-primary" onclick="publishSurvey()">발행하기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/main.js"></script>
+<script>
+let user;
+let survey = {
+  id: null, title: '새 설문', description: '', status: 'draft',
+  targetCount: 100, reward: 200, questions: [], creatorId: null
+};
+let activeQIdx = -1;
+let isPreview = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  user = requireAuth('creator');
+  if (!user) return;
+  survey.creatorId = user.id;
+
+  const urlId = new URLSearchParams(location.search).get('id');
+  if (urlId) {
+    const existing = DB.getSurveys().find(s => s.id === urlId);
+    if (existing && existing.creatorId === user.id) {
+      survey = JSON.parse(JSON.stringify(existing));
+      document.getElementById('info-title').value  = survey.title;
+      document.getElementById('info-desc').value   = survey.description || '';
+      document.getElementById('info-target').value = survey.targetCount || '';
+      document.getElementById('info-reward').value = String(survey.reward || 200);
+      document.getElementById('survey-title-display').textContent = survey.title;
+    }
+  }
+  renderQList();
+  if (survey.questions.length > 0) selectQuestion(0);
+});
+
+/* ─── Question List ──────────────────────────────────── */
+function renderQList() {
+  const container = document.getElementById('q-list');
+  if (survey.questions.length === 0) {
+    container.innerHTML = '<p style="font-size:.8rem;color:var(--text-sub);text-align:center;padding:8px 0;">문항이 없습니다.</p>';
+    return;
+  }
+  container.innerHTML = survey.questions.map((q, i) => `
+    <div class="q-card ${i === activeQIdx ? 'active' : ''}" onclick="selectQuestion(${i})">
+      <div class="q-card-num">${i+1}</div>
+      <div class="q-card-content">
+        <div class="q-card-text">${q.text || '(제목 없음)'}</div>
+        <div class="q-card-type">${Q_TYPES[q.type]?.label || q.type}</div>
+      </div>
+      <div class="q-card-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-icon btn-ghost btn-sm" title="위로" onclick="moveQ(${i},-1)" ${i===0?'disabled':''}>↑</button>
+        <button class="btn btn-icon btn-ghost btn-sm" title="아래로" onclick="moveQ(${i},1)" ${i===survey.questions.length-1?'disabled':''}>↓</button>
+        <button class="btn btn-icon btn-ghost btn-sm" title="삭제" style="color:var(--danger);" onclick="removeQ(${i})">✕</button>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('empty-editor').style.display = survey.questions.length === 0 ? '' : 'none';
+}
+
+function addQuestion() {
+  const newQ = {
+    id: genId('q'), type: 'single',
+    text: '', required: true,
+    options: ['선택지 1', '선택지 2'],
+    min: 1, max: 5, minLabel: '매우 불만족', maxLabel: '매우 만족'
+  };
+  survey.questions.push(newQ);
+  selectQuestion(survey.questions.length - 1);
+  renderQList();
+}
+
+function removeQ(idx) {
+  survey.questions.splice(idx, 1);
+  if (activeQIdx >= survey.questions.length) activeQIdx = survey.questions.length - 1;
+  renderQList();
+  if (survey.questions.length > 0) selectQuestion(activeQIdx); else clearEditor();
+}
+
+function moveQ(idx, dir) {
+  const arr = survey.questions;
+  const target = idx + dir;
+  if (target < 0 || target >= arr.length) return;
+  [arr[idx], arr[target]] = [arr[target], arr[idx]];
+  activeQIdx = target;
+  renderQList();
+  renderEditor(activeQIdx);
+}
+
+/* ─── Editor ─────────────────────────────────────────── */
+function selectQuestion(idx) {
+  activeQIdx = idx;
+  renderQList();
+  renderEditor(idx);
+}
+
+function clearEditor() {
+  document.getElementById('editor-area').innerHTML = `
+    <div class="empty-state" id="empty-editor">
+      <div class="empty-icon">✏️</div>
+      <h3>문항을 추가해 보세요</h3>
+      <p>왼쪽의 '+ 문항 추가' 버튼을 눌러 첫 번째 문항을 만드세요.</p>
+    </div>
+  `;
+}
+
+function renderEditor(idx) {
+  const q = survey.questions[idx];
+  if (!q) { clearEditor(); return; }
+
+  let optionsHtml = '';
+  if (q.type === 'single' || q.type === 'multiple') {
+    optionsHtml = `
+      <div class="form-group">
+        <label class="form-label">선택지</label>
+        <div id="options-list">
+          ${q.options.map((opt, oi) => `
+            <div class="option-row">
+              <div class="option-icon ${q.type==='single'?'circle':''}"></div>
+              <input type="text" class="form-input" value="${opt}" oninput="updateOption(${oi}, this.value)" />
+              <button class="btn btn-icon btn-ghost btn-sm" style="color:var(--danger);" onclick="removeOption(${oi})">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="addOption()">+ 선택지 추가</button>
+      </div>
+    `;
+  } else if (q.type === 'scale') {
+    optionsHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" class="form-group">
+        <div>
+          <label class="form-label">최솟값 레이블</label>
+          <input type="text" class="form-input" value="${q.minLabel||''}" oninput="updateQField('minLabel', this.value)" placeholder="예: 매우 불만족" />
+        </div>
+        <div>
+          <label class="form-label">최댓값 레이블</label>
+          <input type="text" class="form-input" value="${q.maxLabel||''}" oninput="updateQField('maxLabel', this.value)" placeholder="예: 매우 만족" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" class="form-group">
+        <div>
+          <label class="form-label">최솟값</label>
+          <input type="number" class="form-input" value="${q.min||1}" oninput="updateQField('min', Number(this.value))" min="1" max="5" />
+        </div>
+        <div>
+          <label class="form-label">최댓값</label>
+          <input type="number" class="form-input" value="${q.max||5}" oninput="updateQField('max', Number(this.value))" min="3" max="10" />
+        </div>
+      </div>
+    `;
+  } else if (q.type === 'nps') {
+    optionsHtml = `<p style="font-size:.85rem;color:var(--text-sub);background:var(--gray-50);padding:12px;border-radius:var(--radius);">NPS는 0~10 척도로 자동 설정됩니다. "이 서비스를 지인에게 추천할 의향" 형태로 사용하세요.</p>`;
+  }
+
+  document.getElementById('editor-area').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">문항 ${idx+1} 편집</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">문항 유형</label>
+        <select class="form-select" onchange="updateQType(this.value)">
+          ${Object.entries(Q_TYPES).map(([k,v]) => `<option value="${k}" ${q.type===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">문항 텍스트 <span style="color:var(--danger)">*</span></label>
+        <textarea class="form-textarea" rows="2" placeholder="질문을 입력하세요" oninput="updateQField('text', this.value)">${q.text}</textarea>
+      </div>
+      ${optionsHtml}
+      <div class="toggle-group">
+        <label class="toggle">
+          <input type="checkbox" ${q.required?'checked':''} onchange="updateQField('required', this.checked)" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span style="font-size:.875rem;color:var(--gray-700);">필수 응답</span>
+      </div>
+    </div>
+  `;
+}
+
+/* ─── Q field helpers ────────────────────────────────── */
+function updateQField(field, value) {
+  if (activeQIdx < 0) return;
+  survey.questions[activeQIdx][field] = value;
+  if (field === 'text') renderQList();
+}
+function updateQType(type) {
+  const q = survey.questions[activeQIdx];
+  q.type = type;
+  if (type === 'single' || type === 'multiple') {
+    if (!q.options || q.options.length === 0) q.options = ['선택지 1', '선택지 2'];
+  }
+  renderQList();
+  renderEditor(activeQIdx);
+}
+function updateOption(i, val) { survey.questions[activeQIdx].options[i] = val; }
+function addOption() {
+  survey.questions[activeQIdx].options.push(`선택지 ${survey.questions[activeQIdx].options.length + 1}`);
+  renderEditor(activeQIdx);
+}
+function removeOption(i) {
+  survey.questions[activeQIdx].options.splice(i, 1);
+  renderEditor(activeQIdx);
+}
+function updateTitle(val) {
+  survey.title = val || '새 설문';
+  document.getElementById('survey-title-display').textContent = survey.title;
+}
+
+/* ─── Save / Publish ─────────────────────────────────── */
+function gatherSurveyInfo() {
+  survey.title       = document.getElementById('info-title').value.trim() || '새 설문';
+  survey.description = document.getElementById('info-desc').value.trim();
+  survey.targetCount = parseInt(document.getElementById('info-target').value) || 100;
+  survey.reward      = parseInt(document.getElementById('info-reward').value) || 200;
+}
+
+function saveDraft() {
+  gatherSurveyInfo();
+  const surveys = DB.getSurveys();
+  if (!survey.id) {
+    survey.id = genId('survey');
+    survey.status = 'draft';
+    survey.createdAt = new Date().toISOString();
+    surveys.push(survey);
+  } else {
+    const idx = surveys.findIndex(s => s.id === survey.id);
+    if (idx !== -1) surveys[idx] = survey; else surveys.push(survey);
+  }
+  DB.setSurveys(surveys);
+  toast('임시저장 완료!', 'success');
+  history.replaceState(null, '', `/builder.html?id=${survey.id}`);
+}
+
+function openPublishModal() {
+  gatherSurveyInfo();
+  if (survey.questions.length === 0) { toast('문항을 1개 이상 추가하세요.', 'error'); return; }
+  if (!survey.title) { toast('설문 제목을 입력하세요.', 'error'); return; }
+  document.getElementById('pub-q-count').textContent = `${survey.questions.length}개`;
+  document.getElementById('pub-target').textContent  = `${fmtNum(survey.targetCount)}명`;
+  document.getElementById('pub-reward').textContent  = `${fmtNum(survey.reward)} pt/응답`;
+  document.getElementById('publish-modal').classList.add('open');
+}
+function closePublishModal() {
+  document.getElementById('publish-modal').classList.remove('open');
+}
+
+function publishSurvey() {
+  gatherSurveyInfo();
+  survey.status = 'active';
+  if (!survey.id) survey.id = genId('survey');
+  if (!survey.createdAt) survey.createdAt = new Date().toISOString();
+  survey.publishedAt = new Date().toISOString();
+
+  const surveys = DB.getSurveys();
+  const idx = surveys.findIndex(s => s.id === survey.id);
+  if (idx !== -1) surveys[idx] = survey; else surveys.push(survey);
+  DB.setSurveys(surveys);
+  closePublishModal();
+  toast('설문이 발행되었습니다!', 'success');
+  setTimeout(() => window.location.href = '/dashboard.html', 800);
+}
+
+/* ─── Preview ────────────────────────────────────────── */
+function togglePreview() {
+  isPreview = !isPreview;
+  document.getElementById('builder-view').style.display = isPreview ? 'none' : '';
+  document.getElementById('preview-view').style.display  = isPreview ? ''    : 'none';
+  document.getElementById('preview-btn').textContent    = isPreview ? '편집으로 돌아가기' : '미리보기';
+  if (isPreview) renderPreview();
+}
+
+function renderPreview() {
+  gatherSurveyInfo();
+  document.getElementById('preview-title').textContent = survey.title || '미리보기';
+  const container = document.getElementById('preview-content');
+  if (survey.questions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>문항이 없습니다</h3><p>편집 화면에서 문항을 추가하세요.</p></div>';
+    return;
+  }
+  container.innerHTML = `
+    <div style="max-width:620px;margin:0 auto;">
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="font-size:1.3rem;font-weight:800;">${survey.title}</h2>
+        ${survey.description ? `<p style="margin-top:8px;color:var(--text-sub);">${survey.description}</p>` : ''}
+        <div style="display:flex;gap:16px;margin-top:12px;font-size:.82rem;color:var(--text-sub);">
+          <span>📋 ${survey.questions.length}문항</span>
+          <span>⭐ ${survey.reward}pt 지급</span>
+        </div>
+      </div>
+      ${survey.questions.map((q, i) => renderPreviewQ(q, i)).join('')}
+      <button class="btn btn-primary btn-block btn-lg" disabled style="margin-top:8px;">제출하기 (미리보기)</button>
+    </div>
+  `;
+}
+
+function renderPreviewQ(q, i) {
+  let body = '';
+  if (q.type === 'single') {
+    body = q.options.map(opt => `
+      <div class="survey-option">
+        <div class="survey-option-mark"></div>
+        <span>${opt}</span>
+      </div>
+    `).join('');
+  } else if (q.type === 'multiple') {
+    body = q.options.map(opt => `
+      <div class="survey-option">
+        <div class="survey-option-mark survey-option-checkbox"></div>
+        <span>${opt}</span>
+      </div>
+    `).join('');
+  } else if (q.type === 'text') {
+    body = '<textarea class="form-textarea" placeholder="답변을 입력하세요" disabled></textarea>';
+  } else if (q.type === 'scale') {
+    const nums = [];
+    for (let n = (q.min||1); n <= (q.max||5); n++) nums.push(n);
+    body = `
+      <div class="scale-group">
+        ${nums.map(n => `<button class="scale-btn">${n}</button>`).join('')}
+      </div>
+      <div class="scale-labels">
+        <span>${q.minLabel||''}</span>
+        <span>${q.maxLabel||''}</span>
+      </div>
+    `;
+  } else if (q.type === 'nps') {
+    body = `
+      <div class="scale-group">
+        ${[...Array(11)].map((_,n) => `<button class="scale-btn">${n}</button>`).join('')}
+      </div>
+      <div class="scale-labels"><span>전혀 아님 (0)</span><span>매우 그렇다 (10)</span></div>
+    `;
+  }
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="survey-q-label">문항 ${i+1}</div>
+      <div class="survey-q-text">${q.text || '(제목 없음)'}${q.required ? '<span class="survey-q-required">*</span>' : ''}</div>
+      <div style="margin-top:16px;" class="survey-options">${body}</div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
