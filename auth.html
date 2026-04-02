@@ -108,15 +108,8 @@
       <p id="demo-step-desc">Tommy Survey로 이동</p>
     </div>
     <div class="demo-google-body">
-      <!-- Step 1: 이메일 입력 -->
-      <div id="demo-step-email">
-        <input type="email" class="demo-google-input" id="demo-email" placeholder="이메일 또는 전화번호" />
-        <p style="font-size:.75rem;color:#5f6368;margin-top:8px;">이메일을 잊으셨나요? <a href="#" style="color:#1a73e8;">이메일 찾기</a></p>
-      </div>
-      <!-- Step 2: 이름 입력 (신규 가입 시) -->
-      <div id="demo-step-name" style="display:none;">
-        <input type="text" class="demo-google-input" id="demo-name" placeholder="이름 (성 포함)" />
-      </div>
+      <input type="email" class="demo-google-input" id="demo-email" placeholder="이메일 또는 전화번호" />
+      <p style="font-size:.75rem;color:#5f6368;margin-top:8px;">이메일을 잊으셨나요? <a href="#" style="color:#1a73e8;">이메일 찾기</a></p>
     </div>
     <div class="demo-google-footer">
       <button class="demo-google-cancel" onclick="closeDemoModal()">취소</button>
@@ -165,7 +158,6 @@ const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
 let pendingGoogle   = null;
 let googleRoleModal = 'creator';
-let demoStep        = 'email';   // 'email' | 'name'
 
 const isRealOAuth = () => !GOOGLE_CLIENT_ID.startsWith('YOUR_');
 
@@ -225,13 +217,8 @@ function processGoogleUser({ email, name, picture = '' }) {
 
 /* ── 데모 팝업 ────────────────────────────────── */
 function openDemoModal() {
-  demoStep = 'email';
-  document.getElementById('demo-step-email').style.display = '';
-  document.getElementById('demo-step-name').style.display  = 'none';
-  document.getElementById('demo-step-desc').textContent    = 'Tommy Survey로 이동';
-  document.getElementById('demo-next-btn').textContent     = '다음';
   document.getElementById('demo-email').value = '';
-  document.getElementById('demo-name').value  = '';
+  document.getElementById('demo-step-desc').textContent = 'Tommy Survey로 이동';
   document.getElementById('demo-google-modal').classList.add('open');
   setTimeout(() => document.getElementById('demo-email').focus(), 100);
 }
@@ -241,37 +228,17 @@ function closeDemoModal() {
 }
 
 function demoNextStep() {
-  if (demoStep === 'email') {
-    const email = document.getElementById('demo-email').value.trim();
-    if (!email || !email.includes('@')) {
-      document.getElementById('demo-email').style.borderColor = '#EA4335';
-      return;
-    }
-    document.getElementById('demo-email').style.borderColor = '';
-    const existing = DB.getUsers().find(u => u.email === email);
-    if (existing) {
-      // 기존 사용자 → 바로 로그인
-      closeDemoModal();
-      processGoogleUser({ email, name: existing.name });
-    } else {
-      // 신규 → 이름 입력 단계
-      demoStep = 'name';
-      document.getElementById('demo-step-email').style.display = 'none';
-      document.getElementById('demo-step-name').style.display  = '';
-      document.getElementById('demo-step-desc').textContent    = '이름을 입력해 주세요';
-      document.getElementById('demo-next-btn').textContent     = '계속';
-      setTimeout(() => document.getElementById('demo-name').focus(), 100);
-    }
-  } else if (demoStep === 'name') {
-    const email = document.getElementById('demo-email').value.trim();
-    const name  = document.getElementById('demo-name').value.trim();
-    if (!name) {
-      document.getElementById('demo-name').style.borderColor = '#EA4335';
-      return;
-    }
-    closeDemoModal();
-    processGoogleUser({ email, name });
+  const email = document.getElementById('demo-email').value.trim();
+  if (!email || !email.includes('@')) {
+    document.getElementById('demo-email').style.borderColor = '#EA4335';
+    return;
   }
+  document.getElementById('demo-email').style.borderColor = '';
+  // 이름은 이메일 앞부분에서 자동 추출 (실제 OAuth도 동일하게 Google이 제공)
+  const existing = DB.getUsers().find(u => u.email === email);
+  const name = existing?.name ?? email.split('@')[0];
+  closeDemoModal();
+  processGoogleUser({ email, name });
 }
 
 /* ── 역할 선택 모달 ───────────────────────────── */
