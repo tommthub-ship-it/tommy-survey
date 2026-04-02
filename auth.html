@@ -16,6 +16,52 @@
     }
     .google-btn:hover { background: var(--gray-50); box-shadow: var(--shadow-sm); }
     .google-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    /* 데모 Google 팝업 */
+    .demo-google-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; padding: 24px; opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .demo-google-modal.open { opacity: 1; pointer-events: all; }
+    .demo-google-box {
+      background: #fff; border-radius: 12px; width: 100%; max-width: 400px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.2); overflow: hidden;
+      transform: translateY(16px); transition: transform .2s;
+    }
+    .demo-google-modal.open .demo-google-box { transform: translateY(0); }
+    .demo-google-header {
+      padding: 24px 28px 0;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+    }
+    .demo-google-header svg { width: 68px; margin-bottom: 10px; }
+    .demo-google-header h2 { font-size: 1.35rem; font-weight: 700; color: #202124; margin-bottom: 6px; }
+    .demo-google-header p  { font-size: .85rem; color: #5f6368; margin-bottom: 20px; }
+    .demo-google-body { padding: 0 28px 24px; }
+    .demo-google-input {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #dadce0; border-radius: 6px;
+      font-size: .95rem; color: #202124; outline: none; transition: border-color .15s;
+    }
+    .demo-google-input:focus { border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,.15); }
+    .demo-google-footer {
+      padding: 12px 28px 20px;
+      display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .demo-google-cancel {
+      padding: 9px 20px; border-radius: 6px; border: none; background: none;
+      font-size: .9rem; font-weight: 600; color: #1a73e8; cursor: pointer;
+    }
+    .demo-google-cancel:hover { background: #f0f4ff; }
+    .demo-google-next {
+      padding: 9px 24px; border-radius: 6px; border: none;
+      background: #1a73e8; color: white; font-size: .9rem; font-weight: 600; cursor: pointer;
+    }
+    .demo-google-next:hover { background: #1557b0; }
+    .demo-notice {
+      background: #FEF3C7; border: 1px solid #F59E0B; border-radius: var(--radius-sm);
+      padding: 10px 14px; font-size: .8rem; color: #92400E; margin-bottom: 20px;
+      display: flex; gap: 8px; align-items: flex-start;
+    }
   </style>
 </head>
 <body>
@@ -42,6 +88,40 @@
       가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및
       <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.
     </p>
+  </div>
+</div>
+
+<!-- 데모 Google 로그인 팝업 -->
+<div class="demo-google-modal" id="demo-google-modal">
+  <div class="demo-google-box">
+    <div class="demo-google-header">
+      <!-- Google 로고 -->
+      <svg viewBox="0 0 272 92" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M115.75 47.18c0 12.77-9.99 22.18-22.25 22.18s-22.25-9.41-22.25-22.18C71.25 34.32 81.24 25 93.5 25s22.25 9.32 22.25 22.18zm-9.74 0c0-7.98-5.79-13.44-12.51-13.44S80.99 39.2 80.99 47.18c0 7.9 5.79 13.44 12.51 13.44s12.51-5.55 12.51-13.44z"/>
+        <path fill="#FBBC05" d="M163.75 47.18c0 12.77-9.99 22.18-22.25 22.18s-22.25-9.41-22.25-22.18c0-12.85 9.99-22.18 22.25-22.18s22.25 9.32 22.25 22.18zm-9.74 0c0-7.98-5.79-13.44-12.51-13.44s-12.51 5.46-12.51 13.44c0 7.9 5.79 13.44 12.51 13.44s12.51-5.55 12.51-13.44z"/>
+        <path fill="#4285F4" d="M209.75 26.34v39.82c0 16.38-9.66 23.07-21.08 23.07-10.75 0-17.22-7.19-19.66-13.07l8.48-3.53c1.51 3.61 5.21 7.87 11.17 7.87 7.31 0 11.84-4.51 11.84-13v-3.19h-.34c-2.18 2.69-6.38 5.04-11.68 5.04-11.09 0-21.25-9.66-21.25-22.09 0-12.52 10.16-22.26 21.25-22.26 5.29 0 9.49 2.35 11.68 4.96h.34v-3.61h9.25zm-8.56 20.92c0-7.81-5.21-13.52-11.84-13.52-6.72 0-12.35 5.71-12.35 13.52 0 7.73 5.63 13.36 12.35 13.36 6.63 0 11.84-5.63 11.84-13.36z"/>
+        <path fill="#34A853" d="M225 3v65h-9.5V3h9.5z"/>
+        <path fill="#EA4335" d="M262.02 54.48l7.56 5.04c-2.44 3.61-8.32 9.83-18.48 9.83-12.6 0-22.01-9.74-22.01-22.18 0-13.19 9.49-22.18 20.92-22.18 11.51 0 17.14 9.16 18.98 14.11l1.01 2.52-29.65 12.28c2.27 4.45 5.8 6.72 10.75 6.72 4.96 0 8.4-2.44 10.92-6.14zm-23.27-7.98l19.82-8.23c-1.09-2.77-4.37-4.7-8.23-4.7-4.95 0-11.84 4.37-11.59 12.93z"/>
+        <path fill="#4285F4" d="M35.29 41.41V32h31.69c.31 1.64.47 3.58.47 5.68 0 7.06-1.93 15.79-8.15 22.01-6.05 6.3-13.78 9.66-24.02 9.66C16.32 69.35.36 53.89.36 35.28.36 16.67 16.32 1.21 35.28 1.21c10.5 0 17.98 4.12 23.6 9.49l-6.64 6.64c-4.03-3.78-9.49-6.72-16.97-6.72-13.86 0-24.7 11.17-24.7 25.03 0 13.86 10.84 25.03 24.7 25.03 8.99 0 14.11-3.61 17.39-6.89 2.66-2.66 4.41-6.46 5.1-11.65l-22.47.27z"/>
+      </svg>
+      <h2>로그인</h2>
+      <p id="demo-step-desc">Tommy Survey로 이동</p>
+    </div>
+    <div class="demo-google-body">
+      <!-- Step 1: 이메일 입력 -->
+      <div id="demo-step-email">
+        <input type="email" class="demo-google-input" id="demo-email" placeholder="이메일 또는 전화번호" />
+        <p style="font-size:.75rem;color:#5f6368;margin-top:8px;">이메일을 잊으셨나요? <a href="#" style="color:#1a73e8;">이메일 찾기</a></p>
+      </div>
+      <!-- Step 2: 이름 입력 (신규 가입 시) -->
+      <div id="demo-step-name" style="display:none;">
+        <input type="text" class="demo-google-input" id="demo-name" placeholder="이름 (성 포함)" />
+      </div>
+    </div>
+    <div class="demo-google-footer">
+      <button class="demo-google-cancel" onclick="closeDemoModal()">취소</button>
+      <button class="demo-google-next" id="demo-next-btn" onclick="demoNextStep()">다음</button>
+    </div>
   </div>
 </div>
 
@@ -77,18 +157,22 @@
 <script src="/main.js"></script>
 <script>
 /* ──────────────────────────────────────────────────────
-   Google OAuth Client ID 설정
-   Google Cloud Console → API 및 서비스 → 사용자 인증 정보
-   → OAuth 2.0 클라이언트 ID 에서 발급 후 아래에 입력하세요.
+   Google OAuth Client ID 설정 (선택)
+   Google Cloud Console → OAuth 2.0 클라이언트 ID 발급 후 입력.
+   미설정 시 데모 팝업으로 자동 동작합니다.
    ────────────────────────────────────────────────────── */
 const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
 let pendingGoogle   = null;
 let googleRoleModal = 'creator';
+let demoStep        = 'email';   // 'email' | 'name'
 
+const isRealOAuth = () => !GOOGLE_CLIENT_ID.startsWith('YOUR_');
+
+/* ── GIS 초기화 (실제 Client ID 설정 시) ──────── */
 window.addEventListener('load', () => {
+  if (!isRealOAuth()) return;
   if (typeof google === 'undefined' || !google.accounts) return;
-  if (GOOGLE_CLIENT_ID.startsWith('YOUR_')) return;
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
@@ -97,23 +181,35 @@ window.addEventListener('load', () => {
   });
 });
 
+/* ── 로그인 버튼 클릭 ─────────────────────────── */
 function startGoogleLogin() {
-  if (GOOGLE_CLIENT_ID.startsWith('YOUR_')) {
-    toast('Google Client ID를 auth.html에 설정해 주세요.', 'warning');
-    return;
+  if (isRealOAuth()) {
+    if (typeof google === 'undefined' || !google.accounts) {
+      toast('Google 로그인 스크립트 로딩 중입니다. 잠시 후 다시 시도하세요.', 'warning');
+      return;
+    }
+    google.accounts.id.prompt();
+  } else {
+    openDemoModal();
   }
-  if (typeof google === 'undefined' || !google.accounts) {
-    toast('Google 로그인 스크립트 로딩 중입니다. 잠시 후 다시 시도하세요.', 'warning');
-    return;
-  }
-  google.accounts.id.prompt();
 }
 
+/* ── 실제 Google OAuth 콜백 ───────────────────── */
 function handleGoogleCredential(response) {
-  const payload  = decodeJwt(response.credential);
-  const { email, name, picture } = payload;
-  const existing = DB.getUsers().find(u => u.email === email);
+  const payload = decodeJwt(response.credential);
+  processGoogleUser({ email: payload.email, name: payload.name, picture: payload.picture });
+}
 
+function decodeJwt(token) {
+  const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(decodeURIComponent(
+    atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+  ));
+}
+
+/* ── 공통: Google 사용자 처리 ─────────────────── */
+function processGoogleUser({ email, name, picture = '' }) {
+  const existing = DB.getUsers().find(u => u.email === email);
   if (existing) {
     DB.setSession({ userId: existing.id, role: existing.role });
     toast(`${existing.name}님, 환영합니다!`, 'success');
@@ -127,13 +223,58 @@ function handleGoogleCredential(response) {
   }
 }
 
-function decodeJwt(token) {
-  const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-  return JSON.parse(decodeURIComponent(
-    atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
-  ));
+/* ── 데모 팝업 ────────────────────────────────── */
+function openDemoModal() {
+  demoStep = 'email';
+  document.getElementById('demo-step-email').style.display = '';
+  document.getElementById('demo-step-name').style.display  = 'none';
+  document.getElementById('demo-step-desc').textContent    = 'Tommy Survey로 이동';
+  document.getElementById('demo-next-btn').textContent     = '다음';
+  document.getElementById('demo-email').value = '';
+  document.getElementById('demo-name').value  = '';
+  document.getElementById('demo-google-modal').classList.add('open');
+  setTimeout(() => document.getElementById('demo-email').focus(), 100);
 }
 
+function closeDemoModal() {
+  document.getElementById('demo-google-modal').classList.remove('open');
+}
+
+function demoNextStep() {
+  if (demoStep === 'email') {
+    const email = document.getElementById('demo-email').value.trim();
+    if (!email || !email.includes('@')) {
+      document.getElementById('demo-email').style.borderColor = '#EA4335';
+      return;
+    }
+    document.getElementById('demo-email').style.borderColor = '';
+    const existing = DB.getUsers().find(u => u.email === email);
+    if (existing) {
+      // 기존 사용자 → 바로 로그인
+      closeDemoModal();
+      processGoogleUser({ email, name: existing.name });
+    } else {
+      // 신규 → 이름 입력 단계
+      demoStep = 'name';
+      document.getElementById('demo-step-email').style.display = 'none';
+      document.getElementById('demo-step-name').style.display  = '';
+      document.getElementById('demo-step-desc').textContent    = '이름을 입력해 주세요';
+      document.getElementById('demo-next-btn').textContent     = '계속';
+      setTimeout(() => document.getElementById('demo-name').focus(), 100);
+    }
+  } else if (demoStep === 'name') {
+    const email = document.getElementById('demo-email').value.trim();
+    const name  = document.getElementById('demo-name').value.trim();
+    if (!name) {
+      document.getElementById('demo-name').style.borderColor = '#EA4335';
+      return;
+    }
+    closeDemoModal();
+    processGoogleUser({ email, name });
+  }
+}
+
+/* ── 역할 선택 모달 ───────────────────────────── */
 function selectGoogleRole(role) {
   googleRoleModal = role;
   document.getElementById('modal-role-creator').classList.toggle('active', role === 'creator');
@@ -164,6 +305,12 @@ function completeGoogleSignup() {
     window.location.href = newUser.role === 'creator' ? '/dashboard.html' : '/panel.html';
   }, 500);
 }
+
+/* ── 엔터 키 지원 ────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('demo-google-modal').classList.contains('open')) demoNextStep();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   const user = currentUser();
